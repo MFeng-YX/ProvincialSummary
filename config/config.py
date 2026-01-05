@@ -9,14 +9,11 @@ from logging.handlers import RotatingFileHandler
 class Config():
     
     gpt: dict[str, list[str]] = field(default_factory=dict)
-    routing: dict[str, list[str]] = field(default_factory=dict)
-    transportation: dict[str, list[str]] = field(default_factory=dict)
-    submission: dict[str, list[str]] = field(default_factory=dict)
-    dispatch: dict[str, list[str]] = field(default_factory=dict)
-    inbound: dict[str, list[str]] = field(default_factory=dict)
-    outbound: dict[str, list[str]] = field(default_factory=dict)
-    
-    datapath: str = field(default='./data')
+    report: dict[str, list[str]] = field(default_factory=dict)    
+    day_datapath: str = field(default='./data/day')
+    week_datapath: str = field(default='./data/week')
+    report_datapath: str = field(default='./data/report')
+  
     log_config: dict[str, any] = field(default_factory=lambda: {
         "log_file": "./logs/app.log",
         "level": "INFO",
@@ -76,7 +73,7 @@ class Config():
             raise e("配置文件中的的文件路径不符合规范")
         log_file.parent.mkdir(parents=True, exist_ok=True)
         
-        logger = logging.getLogger("TaotianReport")
+        logger = logging.getLogger("ProvincialSummary")
         level = getattr(logging, self.log_config['level'].upper())
         logger.setLevel(level)
         
