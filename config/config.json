@@ -67,5 +67,7 @@
 
     "week_datapath": "./data/week",
 
-    "report_datapath": "./data/report"
+    "report_datapath": "./data/report",
+
+    "output_path": "./data"
 }

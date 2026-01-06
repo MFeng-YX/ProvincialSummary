@@ -13,6 +13,7 @@ class Config():
     day_datapath: str = field(default='./data/day')
     week_datapath: str = field(default='./data/week')
     report_datapath: str = field(default='./data/report')
+    output_path: str = field(default="./data")
   
     log_config: dict[str, any] = field(default_factory=lambda: {
         "log_file": "./logs/app.log",

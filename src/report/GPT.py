@@ -11,15 +11,17 @@ class GPT():
     """
     
     config: Config = Config.from_json()
-    logger: logging.Logger = logging.getLogger(f"TaotianReport.{__name__}")
+    logger: logging.Logger = logging.getLogger(f"ProvincialSummary.{__name__}")
     
-    def __init__(self, path: list[Path]):
+    def __init__(self, number: int, path: list[Path]):
         """初始化GPT类实例
 
         Args:
+            number (int): 功能数字编码
             path (list[Path]): GPT涉及表格的路径列表
         """
         
+        self.number: int = number
         self.path: list[Path] =path
         self.gpt: dict[str, list[str]] = self.config.gpt
     
@@ -30,13 +32,22 @@ class GPT():
         Returns:
             list[pd.DataFrame]: 读取的文件数据列表
         """
-        
+
+        delay_list: list[pd.DataFrame] = list()
+        city_list: list[pd.DataFrame] = list()
+
         for p in self.path:
             if "延误量" in p.name:
-                delay_quantity: pd.DataFrame = pd.read_excel(p)
+                df_delay: pd.DataFrame = pd.read_excel(p)
+                delay_list.append(df_delay)
                 
             if "城市线路" in p.name:
-                city_route: pd.DataFrame = pd.read_excel(p)
+                df_city: pd.DataFrame = pd.read_excel(p)
+                city_list.append(df_city)
+        
+        delay_quantity: pd.DataFrame = pd.concat(delay_list, axis=0)
+        city_route: pd.DataFrame = pd.concat(city_list, axis=0)
+
         
         dq_columns = self.gpt['各环节延误量'] + self.gpt['计算列']      
         delay_quantity = delay_quantity.loc[:, dq_columns]
@@ -102,12 +113,12 @@ class GPT():
             pd.DataFrame: GPT报表
         """
         self.logger.info("-"*50)
-        self.logger.info("GPT报表制作流程-开始")
+        self.logger.info(f"功能-{self.number}: GPT报表制作流程-开始")
         
         df_list = self.data_read()
         gpt = self.report_production(df_list)
         
-        self.logger.info("GPT报表制作流程-结束")
+        self.logger.info(f"功能-{self.number}: GPT报表制作流程-结束")
         self.logger.info("-"*50)
         
         return gpt

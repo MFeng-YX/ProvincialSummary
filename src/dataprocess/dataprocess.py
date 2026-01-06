@@ -7,16 +7,19 @@ from config.config import Config
 
 class DataProcess():
     
-    logger = logging.getLogger(f"ProvincialSummary.{__name__}")
+    logger: logging.Logger = logging.getLogger(f"ProvincialSummary.{__name__}")
     config: Config = Config.from_json()
 
-    def __init__(self, number: int):
+    def __init__(self, number: int, need: int = 1):
         """初始化 DataProcess 类实例
 
         Args:
             number (int): 功能数字编号
+            need (int): 是否需要转换csv文件, 1为需要/0为不需要. Defaults to 1.
         """
+
         self.number: int = number
+        self.need: int = need
         self.day: str = self.config.day_datapath
         self.week: str = self.config.week_datapath
         self.report: str = self.config.report_datapath
@@ -31,6 +34,13 @@ class DataProcess():
         Returns:
             Path: csv文件路径
         """
+
+        df = pd.read_excel(path)
+
+        csv_path: Path = path.with_suffix(".csv")
+        df.to_csv(csv_path, index=False)
+
+        return csv_path
 
 
     def path_read(self, path: Path) -> list[Path]:
@@ -68,6 +78,10 @@ class DataProcess():
             self.logger.error(f"传入的功能数字编号错误: {self.number}, 请核实代码")
             raise ValueError(f"传入的功能数字编号错误: {self.number}")
         
-        path_list: list[Path] = self.path_read(path)
+        if self.need == 0:
+            path_list: list[Path] = self.path_read(path)
+        elif self.need == 1:
+            excel_list: list[Path] = self.path_read(path)
+            path_list: list[Path] = [self.excel_to_csv(p) for p in excel_list]
         
         return path_list
