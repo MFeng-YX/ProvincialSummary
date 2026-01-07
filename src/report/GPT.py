@@ -38,11 +38,11 @@ class GPT():
 
         for p in self.path:
             if "延误量" in p.name:
-                df_delay: pd.DataFrame = pd.read_excel(p)
+                df_delay: pd.DataFrame = pd.read_csv(p)
                 delay_list.append(df_delay)
                 
             if "城市线路" in p.name:
-                df_city: pd.DataFrame = pd.read_excel(p)
+                df_city: pd.DataFrame = pd.read_csv(p, encoding="latin1")
                 city_list.append(df_city)
         
         delay_quantity: pd.DataFrame = pd.concat(delay_list, axis=0)

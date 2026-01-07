@@ -38,7 +38,7 @@ class DataProcess():
         df = pd.read_excel(path)
 
         csv_path: Path = path.with_suffix(".csv")
-        df.to_csv(csv_path, index=False)
+        df.to_csv(csv_path, index=False, encoding='utf-8')
 
         return csv_path
 
@@ -68,6 +68,9 @@ class DataProcess():
             list[Path]: 生成的文件夹路径列表
         """
 
+        self.logger.info("-"*50)
+        self.logger.info(f"数据路径读取-开始")
+        
         if self.number == 1:
             path: Path = Path(self.day)
         elif self.number == 2:
@@ -83,5 +86,9 @@ class DataProcess():
         elif self.need == 1:
             excel_list: list[Path] = self.path_read(path)
             path_list: list[Path] = [self.excel_to_csv(p) for p in excel_list]
+        
+        self.logger.info(f"一共读取到: {len(path_list)}个文件路径.")
+        self.logger.info(f"数据路径读取-结束")
+        self.logger.info("-"*50)
         
         return path_list
