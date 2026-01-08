@@ -1,6 +1,9 @@
 import pandas as pd
 import logging
+import openpyxl
+import csv
 
+from tqdm import tqdm
 from pathlib import Path
 
 from config.config import Config
@@ -35,10 +38,52 @@ class DataProcess():
             Path: csv文件路径
         """
 
-        df = pd.read_excel(path)
-
         csv_path: Path = path.with_suffix(".csv")
-        df.to_csv(csv_path, index=False, encoding='utf-8')
+        
+        self.logger.info(f"\n-- 正在读取 {path.name} --")
+        wb: openpyxl.Workbook = openpyxl.load_workbook(path, read_only=False)
+        ws = wb.active
+        
+        chunk_size: int = 5000
+        
+        max_row = ws.max_row
+        max_col = ws.max_column
+        
+        self.logger.info(f"总行数: {max_row} | 总列数: {max_col}")
+        
+        self.logger.info(f"\n-- 正在转换 {path.name} --")
+        
+        # 计算总块数（用于进度条）
+        total_chunks = (max_row + chunk_size - 1) // chunk_size
+        
+        with open(csv_path, 'w', newline="", encoding='utf-8') as f:
+            writer = csv.writer(f)
+            
+            # 使用tqdm显示进度条
+            for chunk_idx, start_row in enumerate(tqdm(
+                range(1, max_row + 1, chunk_size),
+                total=total_chunks,
+                desc="转换进度",
+                unit="块",
+                ncols=100,
+                bar_format="{l_bar}{bar}{r_bar}"
+            )):
+                end_row = min(start_row + chunk_size - 1, max_row)
+                
+                # 读取当前块
+                rows = ws.iter_rows(
+                    min_row=start_row,
+                    max_row=end_row,
+                    min_col=1,
+                    max_col=max_col,
+                    values_only=True
+                )
+                
+                # 写入CSV（不显示进度，因为进度条已在tqdm中）
+                for row in rows:
+                    writer.writerow(row)
+        
+        wb.close()
 
         return csv_path
 
@@ -85,7 +130,7 @@ class DataProcess():
             path_list: list[Path] = self.path_read(path)
             path_list = [p for p in path_list if p.suffix == ".csv"]
         elif self.need == 1:
-            excel_list: list[Path] = self.path_read(path)
+            excel_list: list[Path] = [p for p in self.path_read(path) if p.suffix == ".xlsx"]
             path_list: list[Path] = [self.excel_to_csv(p) for p in excel_list]
         
         self.logger.info(f"一共读取到: {len(path_list)}个文件路径.")

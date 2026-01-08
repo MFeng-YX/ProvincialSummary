@@ -54,8 +54,8 @@ class GPT():
         
         delay_quantity: pd.DataFrame = pd.concat(delay_list, axis=0)
         city_route: pd.DataFrame = pd.concat(city_list, axis=0)
-        print(len(delay_quantity))
-        print(len(city_route))
+        self.logger.info(f"延误量表格 总行数: {len(delay_quantity)}")
+        self.logger.info(f"城市线路表格 总行数: {len(city_route)}")
         
         dq_columns = self.gpt['各环节延误量'] + self.gpt['计算列']      
         delay_quantity = delay_quantity.loc[:, dq_columns]
