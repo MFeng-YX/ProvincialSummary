@@ -187,14 +187,17 @@ class MainProcess():
         diffdata = result['与第一差值（核实）'].copy().astype(str).apply(
             lambda x: float(x[:-1])/100 if any(char.isdigit() for char in x) else 0
         )
-        result['差值变化'] = result["与第一差值（全量）"] / 100 - diffdata
+        
+        result["与第一差值（全量）"] = result["与第一差值（全量）"] / 10000
+        result['差值变化'] = result["与第一差值（全量）"] - diffdata
         result['差值变化'] = result['差值变化'].apply(lambda x: f"{x: .2%}")
+        result["与第一差值（全量）"] = result["与第一差值（全量）"].apply(lambda x: f"{x: .2%}")
         
         result['与第一差值'] = result['与第一差值'].apply(
             lambda x: float(x) if any(char.isdigit() for char in x) else 0
         )
         result['与第一差值'] = result['与第一差值'].astype(float).apply(
-            lambda x: f"{x: .2f}%" 
+            lambda x: f"{x * 100: .2f}%" 
         )
         # result['延误占比'] = result['延误占比'].apply(
         #     lambda x: float(x) if any(char.isdigit() for char in x) else 0
