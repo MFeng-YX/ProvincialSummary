@@ -83,6 +83,7 @@ class DataProcess():
         
         if self.need == 0:
             path_list: list[Path] = self.path_read(path)
+            path_list = [p for p in path_list if p.suffix == ".csv"]
         elif self.need == 1:
             excel_list: list[Path] = self.path_read(path)
             path_list: list[Path] = [self.excel_to_csv(p) for p in excel_list]

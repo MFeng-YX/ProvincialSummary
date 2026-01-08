@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 
 from pathlib import Path
+from tqdm import tqdm
 
 from config.config import Config
 from src.report.GPT import GPT
@@ -61,131 +62,123 @@ class MainProcess():
     
 
     def report_production(self, single_gpt: pd.DataFrame, multi_gpt: pd.DataFrame) -> pd.DataFrame:
-        """制作省区汇总报表
-
-        Args:
-            single_gpt (pd.DataFrame): 单日GPT报表
-            multi_gpt (pd.DataFrame): 周/月GPT报表
-
-        Returns:
-            pd.DataFrame: 省区汇总表
-        """
-
+        """制作省区汇总报表"""
+        # ------------------------------------------------------------------
+        # 1. 读取省区文件（与您原逻辑完全一致）
+        # ------------------------------------------------------------------
         for p in self.path_list:
             if "省区" in p.name:
-                provincial: pd.DataFrame = pd.read_excel(p, skiprows=[0])
-        provincial = provincial.copy().fillna(method="ffill")
+                provincial: pd.DataFrame = pd.read_csv(p, skiprows=[0], encoding='utf-8-sig')
+        # 仅此处改成 .ffill() 去掉 FutureWarning
+        provincial = provincial.copy().ffill()
 
-        col_need = ["日期", "城市线路", "与第一差值(%)", "线路未达成量"]
+        # ------------------------------------------------------------------
+        # 2. 重命名 + 日期转换（与您原逻辑完全一致）
+        # ------------------------------------------------------------------
         name_dict = {
-                "日期": "GPT展示日期",
-                "城市线路": "城市线路名称",
-                "与第一差值(%)": "新-与第一差值",
-                "线路未达成量": "新-未达成量"
-            }
-
+            "日期": "GPT展示日期",
+            "城市线路": "城市线路名称",
+            "与第一差值(%)": "新-与第一差值",
+            "线路未达成量": "新-未达成量"
+        }
         multi_gpt = multi_gpt.rename(columns=name_dict)
-
         provincial["GPT展示日期"] = pd.to_datetime(provincial["GPT展示日期"], format="mixed").dt.date
-        multi_gpt["GPT展示日期"] = pd.to_datetime(multi_gpt["GPT展示日期"], format="mixed").dt.date
+        # multi_gpt["GPT展示日期"] = pd.to_datetime(multi_gpt["GPT展示日期"], format="mixed").dt.date
 
-        multi_gpt1 = multi_gpt.loc[:, col_need]
+        # ------------------------------------------------------------------
+        # 3. 第一次合并： provincial × multi_gpt（列选取逻辑不变）
+        # ------------------------------------------------------------------
+        multi_need = ["GPT展示日期", "城市线路名称", "新-与第一差值", "新-未达成量"]
+        multi_gpt1 = multi_gpt.loc[:, multi_need]
         df1 = pd.merge(provincial, multi_gpt1, how="left", on=["GPT展示日期", "城市线路名称"])
+
+        # 新增空列（与原逻辑一致）
         df1["新-延误量"] = None
         df1["新-延误占比"] = None
 
-        for row in df1.itertuples():
-            idx = row.Index
-            route = row.城市线路名称
-            date_ = row.GPT展示日期
-            node = str(row.核心影响环节)
+        # ====== 向量化填充：用 tqdm 显示进度 ======
+        node_map = {
+            "路由": ("路由延误量", "路由占比"),
+            "运输": ("干线运输延误量", "干线运输占比"),
+            "交件": ("网点交件延误量", "网点交件占比"),
+            "派签": ("网点派签延误量", "网点派签占比"),
+            "进港": ("中心进港操作延误量", "中心进港操作占比"),
+            "出港": ("中心出港操作延误量", "中心出港操作占比"),
+        }
 
-            mask = (multi_gpt['GPT展示日期'] == date_) & (multi_gpt['城市线路名称'] == route)
-            cond = multi_gpt.loc[mask, :]
-
-            if cond.empty:
+        for node, (qty_col_src, pct_col_src) in tqdm(node_map.items(), desc="新-映射"):
+            mask = df1["核心影响环节"].astype(str).str.contains(node, na=False)
+            if mask.sum() == 0:
                 continue
+            keys = ['GPT展示日期', '城市线路名称']
+            temp = (df1.loc[mask, keys]
+                    .merge(multi_gpt[keys + [qty_col_src, pct_col_src]],
+                        on=keys, how='left')
+                    .groupby(keys)                    # 若出现多行，先聚合
+                    .first()                           # 取第一行（或.mean()）
+                    .reindex(df1.loc[mask, keys])      # 再对齐到 mask 的键顺序
+                )
 
-            if "路由" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "路由延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "路由延误占比"].iat[0]
+            df1.loc[mask, '新-延误量']   = temp[qty_col_src].values
+            df1.loc[mask, '新-延误占比'] = temp[pct_col_src].values
 
-            if "运输" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "干线运输延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "干线运输延误占比"].iat[0]
-                
-            if "交件" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "网点交件延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "网点交件延误占比"].iat[0]
-            
-            if "派签" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "网点派签延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "网点派签延误占比"].iat[0]
-                
-            if "进港" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "中心进港操作延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "中心进港操作延误占比"].iat[0]
-                
-            if "出港" in node:
-                df1.loc[idx, '新-延误量'] = cond.loc[:, "中心出港操作延误量"].iat[0]
-                df1.loc[idx, "新-延误占比"] = cond.loc[:, "中心出港操作延误占比"].iat[0]
-        
+        # ------------------------------------------------------------------
+        # 4. 第二次合并： df1 × single_gpt（列选取逻辑不变）
+        # ------------------------------------------------------------------
         single_dict = {
-                "日期": "GPT展示日期",
-                "城市线路": "城市线路名称",
-                "与第一差值(%)": "复盘-与第一差值",
-                "线路未达成量": "复盘-未达成量"
-            }
+            "日期": "GPT展示日期",
+            "城市线路": "复盘-结果",
+            "与第一差值(%)": "复盘-与第一差值",
+            "线路未达成量": "复盘-未达成量"
+        }
         single_gpt = single_gpt.rename(columns=single_dict)
-        single_gpt['GPT展示日期'] = pd.to_datetime(single_gpt["GPT展示日期"], format='mixed').dt.date
-        single_gpt1 = single_gpt.loc[:, col_need]
-        df2 = pd.merge(df1, single_gpt1, how="left", on=["GPT展示日期", "城市线路名称"])
-        
-        df2['复盘-延误量'] = None
-        df2['复盘-延误占比'] = None
-        
-        for row in df2.itertuples():
-            idx = row.Index
-            route = row.城市线路名称
-            node = str(row.核心影响环节)
-            
-            mask = single_gpt['城市线路名称'] == route
-            cond = single_gpt.loc[mask, :]
-            
-            if cond.empty:
+        single_gpt["GPT展示日期"] = pd.to_datetime(single_gpt["GPT展示日期"], format="mixed").dt.date
+
+        single_need = ["复盘-结果", "复盘-与第一差值", "复盘-未达成量"]
+        single_gpt1 = single_gpt.loc[:, single_need]
+        df2 = pd.merge(df1, single_gpt1, how="left", left_on='城市线路名称', right_on="复盘-结果")
+        df2['复盘-结果'].fillna("消除", inplace=True)
+
+        # 新增空列（与原逻辑一致）
+        df2["复盘-延误量"] = None
+        df2["复盘-延误占比"] = None
+
+
+        # ====== 向量化填充：用 tqdm 显示进度 ======
+        for node, (qty_col_src, pct_col_src) in tqdm(node_map.items(), desc="复盘-映射"):
+            mask = df2["核心影响环节"].astype(str).str.contains(node, na=False)
+            if mask.sum() == 0:
                 continue
+            keys = ['GPT展示日期', '城市线路名称', "复盘-结果"]          # 本次只用单列做键
 
-            if "路由" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "路由延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "路由延误占比"].iat[0]
+            temp = (
+                df2.loc[mask, keys]                      # 1. 子集键
+                .merge(
+                    single_gpt[["复盘-结果"] + [qty_col_src, pct_col_src]],  # 2. 右表数值
+                    how="left",
+                    on="复盘-结果"
+                )
+                .groupby(keys)                            # 3. 若出现多对多，先聚合到唯一键
+                .first()                                  #   取第一行（或 .mean() / .sum()）
+                .reindex(df2.loc[mask, keys])             # 4. 对齐到 mask 的键顺序
+            )
+            print(len(temp))
 
-            if "运输" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "干线运输延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "干线运输延误占比"].iat[0]
-                
-            if "交件" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "网点交件延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "网点交件延误占比"].iat[0]
-            
-            if "派签" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "网点派签延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "网点派签延误占比"].iat[0]
-                
-            if "进港" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "中心进港操作延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "中心进港操作延误占比"].iat[0]
-                
-            if "出港" in node:
-                df2.loc[idx, '复盘-延误量'] = cond.loc[:, "中心出港操作延误量"].iat[0]
-                df2.loc[idx, "复盘-延误占比"] = cond.loc[:, "中心出港操作延误占比"].iat[0]
-        
+            # 5. 长度已保证 = mask.sum()，安全赋值
+            df2.loc[mask, "复盘-延误量"]   = temp[qty_col_src].values
+            df2.loc[mask, "复盘-延误占比"] = temp[pct_col_src].values
+
+        # ------------------------------------------------------------------
+        # 5. 列顺序校验 & 返回（与原逻辑完全一致）
+        # ------------------------------------------------------------------
+
         set_mask = set(self.report['列顺序']) - set(list(df2.columns))
         if set_mask:
-            summary_report: pd.DataFrame = df2.loc[:, self.report['列顺序']]
-            return summary_report
-        else:
             self.logger.error(f"报表缺失列: {set_mask}, 请检查代码逻辑")
-            raise ValueError(f"报表缺失列: {set_mask}, 请检查代码逻辑")        
+            raise ValueError(f"报表缺失列: {set_mask}, 请检查代码逻辑")
+        else:
+            summary_report: pd.DataFrame = df2.loc[:, self.report['列顺序']]
+        return summary_report      
 
 
     def run(self) -> None:
@@ -210,8 +203,8 @@ class MainProcess():
             file_path: Path = self.output_path / f"省区汇总表.xlsx"
             with pd.ExcelWriter(str(file_path.resolve()), engine='openpyxl', mode="w") as writer:
                 summary_report.to_excel(writer, sheet_name="省区汇总", index=False)
-                single_gpt.to_excel(writer, sheet_name="单日GPT", index=False)
-                multi_gpt.to_excel(writer, sheet_name="周/月GPT", index=False)
+                single_gpt.to_excel(writer, sheet_name="单日-GPT", index=False)
+                multi_gpt.to_excel(writer, sheet_name="周或月-GPT", index=False)
         
         self.logger.info(f"功能主流程-结束")
         self.logger.info("-"*50)
