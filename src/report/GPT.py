@@ -38,12 +38,13 @@ class GPT():
         city_list: list[pd.DataFrame] = list()
 
         if self.number == 1:
-            path = [p for p in self.path if len(p.name) < 17]
+            path = [p for p in self.path if len(p.name) < 15]
         
         if self.number == 2:
-            path = [p for p in self.path if len(p.name) >= 17]
+            path = [p for p in self.path if len(p.name) >= 15]
 
         for p in path:
+            print(p.name)
             if "延误量" in p.name:
                 df_delay: pd.DataFrame = pd.read_csv(p, encoding='utf-8-sig')
                 delay_list.append(df_delay)

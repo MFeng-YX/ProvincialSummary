@@ -85,7 +85,8 @@ class MainProcess():
             "线路未达成量": "未达成量（核实）"
         }
         multi_gpt = multi_gpt.rename(columns=name_dict)
-        provincial["GPT展示日期"] = pd.to_datetime(provincial["GPT展示日期"], format="mixed").dt.date
+        # provincial["GPT展示日期"] = pd.to_datetime(provincial["GPT展示日期"], format="mixed").dt.date
+        provincial["GPT展示日期"] = pd.to_datetime(provincial["GPT展示日期"], errors='coerce').dt.date
         # multi_gpt["GPT展示日期"] = pd.to_datetime(multi_gpt["GPT展示日期"], format="mixed").dt.date
 
         # ------------------------------------------------------------------
@@ -193,9 +194,9 @@ class MainProcess():
         result['差值变化'] = result['差值变化'].apply(lambda x: f"{x: .2%}")
         result["与第一差值（全量）"] = result["与第一差值（全量）"].apply(lambda x: f"{x: .2%}")
         
-        result['与第一差值'] = result['与第一差值'].apply(
-            lambda x: float(x) if any(char.isdigit() for char in x) else 0
-        )
+        # result['与第一差值'] = result['与第一差值'].apply(
+        #     lambda x: float(x) if any(char.isdigit() for char in x) else 0
+        # )
         result['与第一差值'] = result['与第一差值'].astype(float).apply(
             lambda x: f"{x * 100: .2f}%" 
         )
